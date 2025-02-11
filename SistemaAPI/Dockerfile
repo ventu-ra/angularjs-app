@@ -1,26 +1,33 @@
-# Estágio Base (para o ambiente de produção)
-FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS base
-USER app
-WORKDIR /app
-EXPOSE 5198
-
-# Estágio de Build (para compilar e gerar o código)
+# Stage 1: Build stage
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
-ARG BUILD_CONFIGURATION=Release
+
 WORKDIR /src
+
+# Restore
 COPY ["SistemaAPI/SistemaAPI.csproj", "SistemaAPI/"]
-RUN dotnet restore "./SistemaAPI/SistemaAPI.csproj"
+RUN dotnet restore "SistemaAPI/SistemaAPI.csproj"
+
 COPY . .
+
+
+# Build
+COPY ["SistemaAPI/SistemaAPI.csproj", "SistemaAPI/"]
 WORKDIR "/src/SistemaAPI"
-RUN dotnet build "./SistemaAPI.csproj" -c $BUILD_CONFIGURATION -o /app/build
+RUN dotnet build "SistemaAPI.csproj" -c Release -o /app/build
 
-# Estágio de Publicação (para gerar o código pronto para produção)
+
+# Stage 2: Publish Stage
 FROM build AS publish
-ARG BUILD_CONFIGURATION=Release
-RUN dotnet publish "./SistemaAPI.csproj" -c $BUILD_CONFIGURATION -o /app/publish /p:UseAppHost=false
+RUN dotnet publish "SistemaAPI.csproj" -c Release -o /app/publish
 
-# Estágio Final (para o ambiente de execução)
-FROM base AS final
+
+# Stage 3: Run
+FROM mcr.microsoft.com/dotnet/aspnet:8.0
+ENV ASPNETCORE_URLS=http://0.0.0.0:5198
+# Define environment to Development for Swagger
+ENV ASPNETCORE_ENVIRONMENT=Development
+# Permitir conexões externas no Docker
+EXPOSE 5198
 WORKDIR /app
 COPY --from=publish /app/publish .
 ENTRYPOINT ["dotnet", "SistemaAPI.dll"]
